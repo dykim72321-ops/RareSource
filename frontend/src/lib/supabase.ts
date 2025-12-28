@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These environment variables will be set in your Vercel/Render dashboard
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL_HERE';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+const supabaseUrl = 'https://cheaaltkiwxwrpgyjwgp.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZWFhbHRraXd4d3JwZ3lqd2dwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5MjA3ODgsImV4cCI6MjA4MjQ5Njc4OH0.PgUaKVFpOsEX5-ZkCZGhoC5VUWl6kCeTrHmIKecMFt0';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from './lib/supabase';
 
 // --- Types ---
 interface ComponentPart {
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [marketStats, setMarketStats] = useState<MarketStats | null>(null);
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   // --- Logic ---
   useEffect(() => {
@@ -53,15 +55,36 @@ const App: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setMarketStats(data);
+          // Add random real-time logs to the feed from market stats
+          if (data.recent_logs) {
+             setLogs(prev => [...prev.slice(-10), ...data.recent_logs]);
+          }
         }
       } catch (err) {
         console.error("Failed to sync market intellect");
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    
+    // Load History from Supabase
+    const loadHistory = async () => {
+        const { data, error } = await supabase.from('search_history').select('*').order('created_at', { ascending: false }).limit(5);
+        if (data) {
+            setHistory(data.map((h: any) => h.query));
+        }
+    };
+    loadHistory();
+
+    const interval = setInterval(fetchStats, 10000); // Faster updates for liveliness
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-scroll logs
+  useEffect(() => {
+    if (logContainerRef.current) {
+        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   const handleSearch = async (e?: React.FormEvent, historicalQuery?: string) => {
     if (e) e.preventDefault();
@@ -70,21 +93,29 @@ const App: React.FC = () => {
 
     setPhase('SCOUTING');
     setError(null);
-    setLogs([]); // Clear previous logs
+    setLogs([]); 
     
     // Initial logs simulation
     setLogs(["[BOOT] Initializing Intel Engine...", "[OSINT] Checking Global Broker Manifests...", "[SCANNING] Secondary Market Clusters..."]);
 
+    // Save to Supabase
+    supabase.from('search_history').insert([{ query: targetQuery }]).then(async () => {
+        // Refresh history
+        const { data } = await supabase.from('search_history').select('*').order('created_at', { ascending: false }).limit(5);
+        if (data) setHistory(data.map((h: any) => h.query));
+    });
+
     try {
       const [response] = await Promise.all([
         fetch(`http://localhost:8000/search?q=${encodeURIComponent(targetQuery)}`),
-        new Promise(resolve => setTimeout(resolve, 3500))
+        new Promise(resolve => setTimeout(resolve, 2500)) // Reduced wait time slightly
       ]);
       
       if (!response.ok) throw new Error('System link failure');
       const data: ComponentPart[] = await response.json();
       
       setResults(data.map(item => ({ ...item, basePrice: item.price, is_qc_enabled: false })));
+      // Local history update (backup)
       if (!history.includes(targetQuery)) setHistory(prev => [targetQuery, ...prev].slice(0, 5));
       setPhase('RESULTS');
     } catch (err) {
@@ -213,42 +244,35 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderHero = () => (
-    <section className={`hero-section ${phase !== 'IDLE' ? 'compact' : ''}`}>
-      <div className="container">
-        {phase === 'IDLE' && <h1>Scout the Unfindable.</h1>}
-        <div className="search-container">
-          <form onSubmit={handleSearch}>
-            <input
-              className="search-bar"
-              placeholder="Inject MPN (e.g. TMS320C25)..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" className="search-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
+  const renderHeader = () => (
+    <div className={`hero-section ${phase !== 'IDLE' ? 'compact' : ''}`}>
+      <h1>Global Sourcing Engine</h1>
+      <div className="search-container">
+          <form onSubmit={(e) => handleSearch(e)}>
+              <input 
+                  type="text" 
+                  className="search-bar" 
+                  placeholder="Enter Part Number (e.g. TMS320...)" 
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+              />
+              <button type="submit" className="search-btn">Search</button>
           </form>
-        </div>
       </div>
-    </section>
+    </div>
   );
 
   const renderScouting = () => (
-    <div className="scout-container fade-in">
-      <div className="radar-premium">
-        <div className="scanning-line"></div>
-      </div>
-      <h2 style={{ letterSpacing: '0.3em', fontSize: '1.2rem', color: 'var(--accent)' }}>SATELLITE SYNC IN PROGRESS</h2>
+    <div className="scout-container">
+      <div className="radar-premium" />
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-main)', marginBottom: '1rem' }}>CONNECTING TO GLOBAL DISTRIBUTORS</h2>
+      <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Scanning Digi-Key, Mouser, and 12 Asia Verified Brokers...</div>
       
-      <div className="terminal-feed" style={{ marginTop: '2rem', height: '100px', width: '400px', background: 'rgba(0,0,0,0.5)', borderRadius: '0.5rem', padding: '1rem', overflowY: 'hidden', fontStyle: 'mono', fontSize: '0.7rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="terminal-feed" ref={logContainerRef}>
         {logs.map((log, i) => (
-          <div key={i} style={{ color: 'var(--success)', opacity: 0.5 + (i / logs.length) * 0.5, marginBottom: '0.2rem' }}>
+        <div key={i} style={{ color: '#10b981', opacity: 0.8, marginBottom: '0.2rem' }}>
             {log}
-          </div>
+        </div>
         ))}
       </div>
     </div>
@@ -300,46 +324,45 @@ const App: React.FC = () => {
     </div>
   );
 
+  const renderSuccessModal = () => (
+    <div className="modal-overlay" onClick={() => setShowSuccess(false)}>
+      <div className="modal">
+        <div className="status-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>INVENTORY SECURED</h2>
+        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '0.5rem', marginBottom: '2rem' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>TRACKING INTEL ID</div>
+          <div style={{ fontStyle: 'mono', color: 'var(--accent)', fontWeight: 'bold' }}>{trackingId}</div>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: '1.6' }}>
+          Procurement lock initiated for MPN: <strong>{selectedPart?.mpn}</strong>.<br/>
+          Shipment authorization is pending financial clearance.
+        </p>
+        <button className="buy-btn" onClick={() => { setShowSuccess(false); setPhase('IDLE'); }}>
+          RETURN TO COMMAND CENTER
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="app-wrapper">
       {renderSidebar()}
       
       <main className="main-content">
-        {renderTopBar()}
-        {renderHero()}
-
-        <section style={{ paddingBottom: '5rem' }}>
-          {error && <div className="container" style={{ color: 'var(--danger)', textAlign: 'center' }}>[TERMINAL_ERROR] {error}</div>}
-          {phase === 'SCOUTING' && renderScouting()}
-          {phase === 'RESULTS' && renderResults()}
-        </section>
+        {renderHeader()}
+        
+        {error && <div style={{ color: 'var(--danger)', textAlign: 'center', padding: '2rem' }}>[ERROR] {error}</div>}
+        {phase === 'SCOUTING' && renderScouting()}
+        {phase === 'RESULTS' && renderResults()}
       </main>
 
-      {showSuccess && (
-        <div className="modal-overlay" onClick={() => setShowSuccess(false)}>
-          <div className="modal">
-            <div className="status-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>INVENTORY SECURED</h2>
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '0.5rem', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>TRACKING INTEL ID</div>
-              <div style={{ fontStyle: 'mono', color: 'var(--accent)', fontWeight: 'bold' }}>{trackingId}</div>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: '1.6' }}>
-              Procurement lock initiated for MPN: <strong>{selectedPart?.mpn}</strong>.<br/>
-              Shipment authorization is pending financial clearance.
-            </p>
-            <button className="buy-btn" onClick={() => { setShowSuccess(false); setPhase('IDLE'); }}>
-              RETURN TO COMMAND CENTER
-            </button>
-          </div>
-        </div>
-      )}
+      {showSuccess && renderSuccessModal()}
     </div>
   );
-};
+}
 
 export default App;

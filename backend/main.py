@@ -56,17 +56,30 @@ class LockConfirmation(BaseModel):
 
 # --- [2. 인텔리전스 소싱 커넥터] ---
 
+from scraper_examples import aggregate_from_multiple_sources
+
+# --- [2. 인텔리전스 소싱 커넥터] ---
+
 def generate_mock_logs(query: str):
     sources = ["Digi-Key Global API", "Mouser Electronics", "Win Source Scraper", "Verical Deep-Link", "Global Broker Index #12", "Asian Secondary Market Scan"]
     status = ["[CONNECTING]", "[AUTH_SUCCESS]", "[SCRAPING_DOM]", "[PARSING_JSON]", "[EXTRACTING_STOCK]", "[CALCULATING_MARGIN]"]
     return [f"{random.choice(status)} {random.choice(sources)} for {query.upper()}" for _ in range(5)]
 
+# [UPDATED] Using Real Scraper Module
 async def fetch_tier1_api(query: str):
-    """[Tier 1] Authorized Distributors (Official Data)"""
-    await asyncio.sleep(random.uniform(0.2, 0.5))
+    """[Tier 1] Authorized Distributors (via Scraper Module)"""
+    try:
+        # Call the scraper module we built
+        results = await aggregate_from_multiple_sources(query)
+        if results:
+            return results
+    except Exception as e:
+        print(f"[Scraper Error] {e}")
+    
+    # Fallback if scraper returns nothing
     return [
         {
-            "distributor": "Digi-Key Global",
+            "distributor": "Digi-Key Global (Fallback)",
             "mpn": query.upper(),
             "mfr": "Analog Devices",
             "stock": 450, 
@@ -76,8 +89,9 @@ async def fetch_tier1_api(query: str):
             "condition": "New Factory", 
             "date_code": "2023+" 
         }
-    ] if "74" not in query else []
+    ]
 
+# [RETAINED] Tier 2/3 for variety (can also be replaced with scrapers later)
 async def fetch_broker_network(query: str):
     """[Tier 2] Verified Broker Network (Rare/EOL Focus)"""
     await asyncio.sleep(random.uniform(0.8, 1.5))
