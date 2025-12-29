@@ -1,15 +1,23 @@
-# System Files
+# System
 .DS_Store
 .env
-.env.local
-node_modules/
+.env.*
+!.env.example
 
 # Python
-backend/venv/
-backend/__pycache__/
-*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
 
-# Frontend
-frontend/dist/
-frontend/build/
-frontend/.vercel/
+# Node
+node_modules/
+dist/
+build/
+.output/
+
+# Logs
+*.log
+npm-debug.log*
