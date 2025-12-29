@@ -1,306 +1,404 @@
 """
 Rare Source - Web Scraping Utilities
-실제 전자부품 유통 사이트를 스크래핑하는 예제 모듈
+Example module for scraping real component distributors.
 """
 
 import asyncio
 import re
 from typing import List, Dict, Optional
 from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-# 필요한 라이브러리들 (설치: pip install httpx beautifulsoup4 playwright)
+# Load environment variables
+load_dotenv()
+
+# Necessary libraries
 try:
     import httpx
     from bs4 import BeautifulSoup
 except ImportError:
-    print("⚠️  httpx와 beautifulsoup4가 필요합니다. 다음 명령어로 설치하세요:")
-    print("pip install httpx beautifulsoup4")
+    print("⚠️  httpx and beautifulsoup4 are required. Please pip install them.")
 
-
-# --- [NEW] Free API Connectors ---
-class FreeApiConnector:
+# --- MOUSER API CONNECTOR (Real Data) ---
+class MouserConnector:
     """
-    Connects to Free Tier APIs (Digi-Key, Mouser, etc.)
-    Uses Environment Variables to check if keys are available.
+    Connects to Mouser Search API (v1)
     """
     def __init__(self):
-        # Replace with os.getenv("DIGIKEY_API_KEY") logic later
-        self.digikey_key = os.getenv("DIGIKEY_API_KEY", "DEMO_KEY_123") 
-    
-    async def fetch_digikey_prices(self, query: str):
-        # [REAL CONNECTOR LOGIC PLACEHOLDER]
-        # Since we don't have a real key yet, we simulate the 'Connected' state.
-        # This structure is ready to accept a real request.
+        self.api_key = os.getenv("MOUSER_API_KEY")
+        self.base_url = "https://api.mouser.com/api/v1/search/partnumber"
         
-        # 1. Check if Key exists
-        if not self.digikey_key or self.digikey_key == "DEMO_KEY_123":
-            print("⚠️  Digi-Key API 키가 설정되지 않았습니다. Mock 데이터를 반환합니다.")
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        if not self.api_key or self.api_key == "YOUR_MOUSER_KEY":
+            print("⚠️  Mouser API Key missing or invalid.")
             return []
             
-        # 2. Simulate Latency (Real API takes time)
-        await asyncio.sleep(0.8)
-        
-        # 3. Return Normalized Data
-        return [
-            {
-                "distributor": "Digi-Key Global (API)",
-                "mpn": query.upper(),
-                "manufacturer": "Texas Instruments",
-                "stock": 1450,
-                "price": 12.50,
-                "currency": "USD",
-                "condition": "New",
-                "risk_level": "Low",
-                "source_type": "Official API"
+        headers = {'Content-Type': 'application/json'}
+        params = {'apiKey': self.api_key}
+        body = {
+            "SearchByPartRequest": {
+                "mouserPartNumber": query,
+                "partSearchOptions": "string"
             }
-        ]
-
-# =============================================================================
-# [방법 1] 간단한 HTML 스크래핑 예제 - BeautifulSoup
-# =============================================================================
-
-async def scrape_octopart_example(mpn: str) -> List[Dict]:
-    """
-    Octopart 스타일의 공개 검색 결과 스크래핑 예제
-    실제 URL은 robots.txt와 이용약관을 확인 후 사용해야 함
-    """
-    
-    # 실제 사용 시에는 타겟 사이트의 검색 URL로 변경
-    # 예: url = f"https://octopart.com/search?q={mpn}"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            # [REAL WEB SCRAPING ATTEMPT]
-            # using a search engine approach to avoid direct blocking if possible, 
-            # or pointing to a known distributor structure. 
-            # For this demo, we will try to hit a demo-friendly endpoint or fallback.
-            
-            # NOTE: Since we cannot guarantee this specific URL works without maintenance,
-            # this block simulates the 'Real' network call structure.
-            # To make this fully functional for a specific site (e.g. WinSource), 
-            # you would uncomment the next lines and adjust the selector.
-            
-            # response = await client.get(url, headers=headers) 
-            # html = response.text
-             
-            # [FALLBACK SIMULATION FOR STABILITY]
-            await asyncio.sleep(1.5) # Simulate network lag
-            mock_html = """
-            <div class="part-result">
-                <span class="mpn">TMS320C25</span>
-                <span class="manufacturer">Texas Instruments</span>
-                <div class="offer">
-                    <span class="price">$12.50</span>
-                    <span class="stock">450</span>
-                    <span class="distributor">Digi-Key Global (Live)</span>
-                </div>
-            </div>
-            <div class="part-result">
-                <span class="mpn">TMS320C25-G</span>
-                <span class="manufacturer">Texas Instruments</span>
-                <div class="offer">
-                    <span class="price">$14.20</span>
-                    <span class="stock">1,200</span>
-                    <span class="distributor">Mouser Electronics (Live)</span>
-                </div>
-            </div>
-            """
-            
-            # Parsing logic (Works on both real and mock HTML)
-            soup = BeautifulSoup(mock_html, 'html.parser')
-            
-            # HTML 구조에 맞게 데이터 추출
-            results = []
-            for part in soup.select('.part-result'):
-                offer = part.select_one('.offer')
-                if offer:
-                    results.append({
-                        "mpn": mpn.upper(),
-                        "mfr": "Texas Instruments",  # part.select_one('.manufacturer').text
-                        "distributor": "Digi-Key",   # offer.select_one('.distributor').text
-                        "price_usd": 12.50,          # float(offer.select_one('.price').text.strip('$'))
-                        "stock": 450,                # int(offer.select_one('.stock').text)
-                        "type": "Meta Scraper",
-                        "condition": "New",
-                        "delivery": "3-5 Days",
-                        "date_code": "2023+"
-                    })
-            
-            return results
-            
-    except Exception as e:
-        print(f"❌ 스크래핑 실패: {e}")
-        return []
-
-
-# =============================================================================
-# [방법 2] Playwright를 사용한 동적 사이트 스크래핑
-# =============================================================================
-
-async def scrape_with_playwright_example(mpn: str) -> List[Dict]:
-    """
-    JavaScript로 렌더링되는 현대적 사이트 스크래핑 예제
-    Playwright 설치: pip install playwright
-    브라우저 설치: playwright install chromium
-    """
-    
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        print("⚠️  Playwright가 설치되지 않았습니다. Mock 데이터를 반환합니다.")
-        return []
-    
-    try:
-        async with async_playwright() as p:
-            # Headless 모드로 브라우저 실행 (보이지 않게)
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            # 실제 사이트 URL (예시)
-            # await page.goto(f"https://www.digikey.com/products/en?keywords={mpn}")
-            
-            # 페이지가 로딩될 때까지 대기
-            # await page.wait_for_selector('.product-details', timeout=5000)
-            
-            # JavaScript로 렌더링된 데이터 추출
-            # price = await page.text_content('.price')
-            # stock = await page.text_content('.stock-quantity')
-            
-            await browser.close()
-            
-            # 추출된 데이터 반환
-            return [{
-                "mpn": mpn.upper(),
-                "mfr": "Example Manufacturer",
-                "distributor": "Digi-Key Global",
-                "price_usd": 15.00,
-                "stock": 200,
-                "type": "API",
-                "condition": "New Factory",
-                "delivery": "2-3 Days",
-                "date_code": "2024"
-            }]
-            
-    except Exception as e:
-        print(f"❌ Playwright 스크래핑 실패: {e}")
-        return []
-
-
-# =============================================================================
-# [방법 3] 공식 API 사용 (가장 권장)
-# =============================================================================
-
-async def fetch_digikey_api_example(mpn: str, api_key: str = "YOUR_API_KEY") -> List[Dict]:
-    """
-    Digi-Key 공식 API를 사용한 데이터 조회 예제
-    API 키 발급: https://developer.digikey.com/
-    """
-    
-    # API 키가 없으면 Mock 데이터 반환
-    if api_key == "YOUR_API_KEY":
-        print("⚠️  API 키가 설정되지 않았습니다. Mock 데이터를 반환합니다.")
-        return []
-    
-    headers = {
-        "X-DIGIKEY-Client-Id": api_key,
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    params = {
-        "keywords": mpn,
-        "limit": 10
-    }
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.digikey.com/v1/Search/KeywordSearch",
-                headers=headers,
-                params=params
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # API 응답 파싱
-                results = []
-                for item in data.get('Products', []):
-                    results.append({
-                        "mpn": item.get('ManufacturerPartNumber'),
-                        "mfr": item.get('Manufacturer', {}).get('Name'),
-                        "distributor": "Digi-Key",
-                        "price_usd": item.get('UnitPrice'),
-                        "stock": item.get('QuantityAvailable'),
-                        "type": "API",
-                        "condition": "New",
-                        "delivery": "3-5 Days",
-                        "date_code": "2024"
-                    })
-                return results
-            else:
-                print(f"API 오류: {response.status_code}")
-                return []
+        }
+        
+        try:
+            print(f"🔌 Connecting to Mouser API for: {query}...")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(self.base_url, params=params, json=body, headers=headers)
                 
-    except Exception as e:
-        print(f"❌ API 호출 실패: {e}")
-        return []
+                if response.status_code == 200:
+                    data = response.json()
+                    return self._parse_results(data, query)
+                else:
+                    print(f"❌ Mouser API Error: {response.status_code} - {response.text[:100]}")
+                    return []
+        except Exception as e:
+            print(f"❌ Mouser Connector Exception: {e}")
+            return []
+            
+    def _parse_results(self, data, query):
+        parts = []
+        try:
+            search_results = data.get('SearchResults', {})
+            items = search_results.get('Parts', [])
+            
+            for item in items:
+                # Stock normalization
+                availability = item.get('Availability', '0')
+                stock_str = ''.join(filter(str.isdigit, availability.split(' ')[0]))
+                stock = int(stock_str) if stock_str else 0
+                
+                # Price extraction
+                price_breaks = item.get('PriceBreaks', [])
+                price = 0.0
+                currency = 'USD'
+                
+                if price_breaks:
+                    # Prefer price for quantity 1, or the first available
+                    pb = price_breaks[0]
+                    price_str = pb.get('Price', '0').replace('$', '').replace(',', '')
+                    currency = pb.get('Currency', 'USD')
+                    try: 
+                        price = float(price_str)
+                    except: 
+                        price = 0.0
+                        
+                parts.append({
+                    "distributor": "Mouser Electronics (API)",
+                    "mpn": item.get('ManufacturerPartNumber', query),
+                    "manufacturer": item.get('Manufacturer', 'Unknown'),
+                    "stock": stock,
+                    "price": price,
+                    "currency": currency,
+                    "condition": "New",
+                    "risk_level": "Low",
+                    "source_type": "Official API",
+                    "datasheet": item.get('DataSheetUrl', ''),
+                    "description": item.get('Description', ''),
+                    "date_code": "2024+", # Placeholder
+                    "delivery": item.get('LeadTime', 'In Stock')
+                })
+        except Exception as parse_err:
+            print(f"⚠️ Mouser Parse Error: {parse_err}")
+            
+        return parts
 
+# --- DIGI-KEY API CONNECTOR (Real Data) ---
+class DigiKeyConnector:
+    """
+    Connects to Digi-Key Product Information API v4.
+    Requires OAuth2 Token traversal.
+    """
+    def __init__(self):
+        self.client_id = os.getenv("DIGIKEY_CLIENT_ID")
+        self.client_secret = os.getenv("DIGIKEY_CLIENT_SECRET")
+        self.token_url = "https://api.digikey.com/v1/oauth2/token"
+        self.base_url = "https://api.digikey.com/Search/v3/Products/Keyword" # v3 is simpler, or v4
+        # Note: v4 path is often /products/v4/search/keyword or similar. Let's use v3 for simplicity if available, or check specific endpoint.
+        # Actually, let's use the standard "Keyword Search" which is often mapped to /Search/v3/Products/Keyword within many SDKs, 
+        # but the raw API documentation specifies: https://api.digikey.com/products/v4/search/keyword
+        self.search_url = "https://api.digikey.com/products/v4/search/keyword"
+        self.access_token = None
+        self.token_expires_at = 0
+
+    async def _get_token(self):
+        """Fetch or refresh OAuth2 Access Token"""
+        import time
+        if self.access_token and time.time() < self.token_expires_at:
+            return self.access_token
+
+        if not self.client_id or not self.client_secret:
+            return None
+
+        # Prepare for application/x-www-form-urlencoded
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(self.token_url, data=data)
+                if resp.status_code == 200:
+                    token_data = resp.json()
+                    self.access_token = token_data.get("access_token")
+                    expires_in = token_data.get("expires_in", 3600)
+                    self.token_expires_at = time.time() + expires_in - 60 # buffer
+                    return self.access_token
+                else:
+                    print(f"❌ Digi-Key Token Error: {resp.status_code} - {resp.text}")
+                    return None
+        except Exception as e:
+            print(f"❌ Digi-Key Token Exception: {e}")
+            return None
+
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        token = await self._get_token()
+        if not token:
+            print("⚠️ Skipping Digi-Key (No Token)")
+            return []
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-DIGIKEY-Client-Id": self.client_id,
+            "X-DIGIKEY-Locale-Site": "US",
+            "X-DIGIKEY-Locale-Language": "en",
+            "Content-Type": "application/json"
+        }
+
+        body = {
+            "Keywords": query,
+            "Limit": 10
+        }
+
+        try:
+            print(f"🔌 Connecting to Digi-Key API for: {query}...")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(self.search_url, json=body, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return self._parse_results(data, query)
+                else:
+                    print(f"❌ Digi-Key API Error: {response.status_code}")
+                    return []
+        except Exception as e:
+            print(f"❌ Digi-Key Connector Exception: {e}")
+            return []
+
+    def _parse_results(self, data, query):
+        parts = []
+        try:
+            products = data.get("Products", [])
+            for item in products:
+                # Price logic
+                price = 0.0
+                currency = "USD"
+                
+                # Check StandardPricing or UnitPrice
+                unit_price = item.get("UnitPrice", 0)
+                if unit_price > 0:
+                    price = unit_price
+                
+                # Stock
+                stock = item.get("QuantityAvailable", 0)
+                
+                parts.append({
+                    "distributor": "Digi-Key Electronics (API)",
+                    "mpn": item.get("ManufacturerPartNumber", query),
+                    "manufacturer": item.get("Manufacturer", {}).get("Value", "Unknown"),
+                    "stock": stock,
+                    "price": price,
+                    "currency": currency,
+                    "condition": "New",
+                    "risk_level": "Low",
+                    "source_type": "Official API",
+                    "datasheet": item.get("DatasheetUrl", ""),
+                    "description": item.get("ProductDescription", ""),
+                    "date_code": "2024+",
+                    "delivery": "Immediate" if stock > 0 else "Backorder"
+                })
+        except Exception as e:
+            print(f"⚠️ Digi-Key Parse Error: {e}")
+            
+        return parts
+
+# --- EOL SPECIALIST CONNECTORS (Rochester, Flip) ---
+
+class RochesterConnector:
+    """
+    Connects to Rochester Electronics (Authorized EOL Distributor).
+    Uses Search URL Scraping / Deep Linking.
+    """
+    def __init__(self):
+        self.base_url = "https://www.rocelec.com/search"
+    
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        # Note: Real scraping requires handling anti-bot protections.
+        # For this version, we provide a 'Deep Link' result that acts as a connector.
+        # If we had a direct API or if the site was simple HTML, we would parse it here.
+        
+        return [{
+            "distributor": "Rochester Electronics (EOL)",
+            "mpn": query.upper(),
+            "manufacturer": "Various (EOL Authorized)",
+            "stock": 0, # Unknown without deep scrape
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "Authorized EOL",
+            "risk_level": "Low",
+            "source_type": "EOL Partner",
+            "description": "Click to check EOL stock directly.",
+            "delivery": "Check Website",
+            "datasheet": f"https://www.rocelec.com/search?q={query}" # Deep link
+        }]
+
+class FlipElectronicsConnector:
+    """
+    Connects to Flip Electronics (EOL Specialist).
+    """
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        return [{
+            "distributor": "Flip Electronics",
+            "mpn": query.upper(),
+            "manufacturer": "Various",
+            "stock": 0,
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "EOL / Obsolete",
+            "risk_level": "Low",
+            "source_type": "EOL Partner",
+            "description": "Authorized EOL Reseller",
+            "delivery": "Contact for Quote",
+            "datasheet": f"https://www.flipelectronics.com/search?q={query}"
+        }]
+
+# --- BROADLINE DISTRIBUTOR DEEP LINKS (No API Key Required) ---
+
+class ArrowConnector:
+    """Generates direct search links for Arrow Electronics."""
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        return [{
+            "distributor": "Arrow Electronics",
+            "mpn": query.upper(),
+            "manufacturer": "Various",
+            "stock": -1, # Check website
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "New",
+            "risk_level": "Low",
+            "source_type": "Deep Link",
+            "description": "Global Distributor",
+            "delivery": "Check Website",
+            "datasheet": f"https://www.arrow.com/en/products/search?q={query}"
+        }]
+
+class FutureElectronicsConnector:
+    """Generates direct search links for Future Electronics."""
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        return [{
+            "distributor": "Future Electronics",
+            "mpn": query.upper(),
+            "manufacturer": "Various",
+            "stock": -1,
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "New",
+            "risk_level": "Low",
+            "source_type": "Deep Link",
+            "description": "Global Distributor",
+            "delivery": "Check Website",
+            "datasheet": f"https://www.futureelectronics.com/search/?q={query}"
+        }]
+
+class RSComponentsConnector:
+    """Generates direct search links for RS Components."""
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        return [{
+            "distributor": "RS Components",
+            "mpn": query.upper(),
+            "manufacturer": "Various",
+            "stock": -1,
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "New",
+            "risk_level": "Low",
+            "source_type": "Deep Link",
+            "description": "Global Distributor",
+            "delivery": "Check Website",
+            "datasheet": f"https://uk.rs-online.com/web/c/?searchTerm={query}"
+        }]
 
 # =============================================================================
-# 통합 스크래퍼 (여러 소스를 하나로 모음)
+# UNIFIED AGGREGATOR
 # =============================================================================
 
 async def aggregate_from_multiple_sources(mpn: str) -> List[Dict]:
     """
-    여러 소스에서 동시에 데이터를 수집하고 통합
+    Aggregates data from 7 Sources: Mouser, Digi-Key, Rochester, Flip, Arrow, Future, RS.
     """
+    results = []
     
-    # 모든 스크래퍼를 비동기로 동시 실행
-    results = await asyncio.gather(
-        scrape_octopart_example(mpn),
-        scrape_with_playwright_example(mpn),
-        # fetch_digikey_api_example(mpn),  # API 키가 있을 때 활성화
-        return_exceptions=True  # 에러가 나도 다른 것들은 계속 실행
-    )
+    # Run Connectors in Parallel
+    mouser = MouserConnector()
+    digikey = DigiKeyConnector()
+    rochester = RochesterConnector()
+    flip = FlipElectronicsConnector()
+    arrow = ArrowConnector()
+    future = FutureElectronicsConnector()
+    rs = RSComponentsConnector()
     
-    # 결과 합치기
-    all_parts = []
-    for source_results in results:
-        if isinstance(source_results, list):
-            all_parts.extend(source_results)
+    # Execute ALL API calls concurrently
+    tasks = [
+        mouser.fetch_prices(mpn),
+        digikey.fetch_prices(mpn),
+        rochester.fetch_prices(mpn),
+        flip.fetch_prices(mpn),
+        arrow.fetch_prices(mpn),
+        future.fetch_prices(mpn),
+        rs.fetch_prices(mpn)
+    ]
     
-    return all_parts
+    connector_results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Process Results
+    for res in connector_results:
+        if isinstance(res, list):
+            results.extend(res)
+        else:
+            print(f"⚠️ A connector failed: {res}")
 
-
-# =============================================================================
-# 테스트 실행 함수
-# =============================================================================
-
-async def test_scrapers():
-    """스크래퍼 테스트"""
-    print("🔍 웹 스크래핑 테스트 시작...\n")
-    
-    mpn = "TMS320C25"
-    
-    print(f"검색 중: {mpn}")
-    print("=" * 50)
-    
-    results = await aggregate_from_multiple_sources(mpn)
-    
-    print(f"\n✅ 총 {len(results)}개의 결과를 찾았습니다:\n")
-    
-    for i, part in enumerate(results, 1):
-        print(f"{i}. {part['distributor']} - ${part['price_usd']} ({part['stock']} units)")
+    # Fallback only if absolutely no data found from real APIs
+    if not results:
+        print("⚠️ No API results found. Falling back to mock data.")
+        # Minimal mock fallback
+        results.append({
+            "distributor": "System (No Results)",
+            "mpn": mpn,
+            "manufacturer": "N/A",
+            "stock": 0,
+            "price": 0.0,
+            "currency": "USD",
+            "condition": "Unknown",
+            "risk_level": "High",
+            "source_type": "Fallback",
+            "description": "No stock found in verified distributors.",
+            "delivery": "Unavailable",
+            "date_code": "N/A"
+        })
     
     return results
 
+# Test logic
+async def test_scrapers():
+    print("🔍 Testing Real Mouser API...")
+    mpn = "LM358"
+    results = await aggregate_from_multiple_sources(mpn)
+    for r in results:
+        print(f"{r['distributor']}: {r['mpn']} - {r['price']} {r['currency']}")
 
-# 직접 실행 시 테스트
 if __name__ == "__main__":
     asyncio.run(test_scrapers())

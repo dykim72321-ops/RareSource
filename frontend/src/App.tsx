@@ -19,6 +19,8 @@ interface ComponentPart {
   is_eol: boolean;
   risk_level: string;
   is_qc_enabled?: boolean;
+  datasheet?: string;
+  description?: string;
 }
 
 interface MarketStats {
@@ -55,7 +57,6 @@ const App: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setMarketStats(data);
-          // Add random real-time logs to the feed from market stats
           if (data.recent_logs) {
              setLogs(prev => [...prev.slice(-10), ...data.recent_logs]);
           }
@@ -66,7 +67,6 @@ const App: React.FC = () => {
     };
     fetchStats();
     
-    // Load History from Supabase
     const loadHistory = async () => {
         const { data, error } = await supabase.from('search_history').select('*').order('created_at', { ascending: false }).limit(5);
         if (data) {
@@ -75,11 +75,10 @@ const App: React.FC = () => {
     };
     loadHistory();
 
-    const interval = setInterval(fetchStats, 10000); // Faster updates for liveliness
+    const interval = setInterval(fetchStats, 10000); 
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll logs
   useEffect(() => {
     if (logContainerRef.current) {
         logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
@@ -95,12 +94,9 @@ const App: React.FC = () => {
     setError(null);
     setLogs([]); 
     
-    // Initial logs simulation
     setLogs(["[BOOT] Initializing Intel Engine...", "[OSINT] Checking Global Broker Manifests...", "[SCANNING] Secondary Market Clusters..."]);
 
-    // Save to Supabase
     supabase.from('search_history').insert([{ query: targetQuery }]).then(async () => {
-        // Refresh history
         const { data } = await supabase.from('search_history').select('*').order('created_at', { ascending: false }).limit(5);
         if (data) setHistory(data.map((h: any) => h.query));
     });
@@ -108,14 +104,13 @@ const App: React.FC = () => {
     try {
       const [response] = await Promise.all([
         fetch(`http://localhost:8000/search?q=${encodeURIComponent(targetQuery)}`),
-        new Promise(resolve => setTimeout(resolve, 2500)) // Reduced wait time slightly
+        new Promise(resolve => setTimeout(resolve, 2500)) 
       ]);
       
       if (!response.ok) throw new Error('System link failure');
       const data: ComponentPart[] = await response.json();
       
       setResults(data.map(item => ({ ...item, basePrice: item.price, is_qc_enabled: false })));
-      // Local history update (backup)
       if (!history.includes(targetQuery)) setHistory(prev => [targetQuery, ...prev].slice(0, 5));
       setPhase('RESULTS');
     } catch (err) {
@@ -278,48 +273,82 @@ const App: React.FC = () => {
     </div>
   );
 
+  const getDistributorBadgeClass = (name: string) => {
+    if (name.toLowerCase().includes('mouser')) return 'dist-mouser';
+    if (name.toLowerCase().includes('digi-key')) return 'dist-digikey';
+    if (name.toLowerCase().includes('eol') || name.toLowerCase().includes('rochester') || name.toLowerCase().includes('flip')) return 'dist-eol';
+    return 'dist-general';
+  };
+
   const renderResults = () => (
     <div className="container fade-in">
       <div className="results-grid">
-        {results.map(part => (
-          <div key={part.id} className="card">
-            <div className="card-header">
-              <div>
-                <div className="mpn">{part.mpn}</div>
-                <div className="manufacturer">{part.manufacturer}</div>
-              </div>
-              <span className="stock-badge">{part.stock.toLocaleString()} UNITS</span>
-            </div>
+        {results.map(part => {
+          const badgeClass = getDistributorBadgeClass(part.distributor);
+          const isDeepLink = part.source_type === 'Deep Link' || part.source_type === 'EOL Partner';
 
-            <table className="data-table">
-              <tbody>
-                <tr><td className="label-cell">Source Access</td><td className="value-cell">{part.distributor}</td></tr>
-                <tr><td className="label-cell">Risk Assessment</td><td className={`value-cell badge-risk-${part.risk_level.toLowerCase()}`}>{part.risk_level}</td></tr>
-                <tr><td className="label-cell">Trend (7D)</td><td className="value-cell"><Sparkline data={part.price_history} /></td></tr>
-                <tr><td className="label-cell">Verification</td><td className="value-cell">{part.condition} / {part.date_code}</td></tr>
-              </tbody>
-            </table>
-
-            {(part.risk_level === 'Medium' || part.risk_level === 'High') && (
-              <div style={{ border: '1px dashed var(--success)', padding: '1rem', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>QC Protocol +₩72,500</span>
-                <input type="checkbox" checked={part.is_qc_enabled} onChange={() => toggleQC(part.id, !!part.is_qc_enabled)} />
-              </div>
-            )}
-
-            <div className="pricing-row">
-              <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>SECURE PRICE</div>
-                <div className="price-main">
-                  {part.price.toLocaleString()}<span className="currency">KRW</span>
+          return (
+            <div key={part.id} className="card">
+              <div className="card-header">
+                <div>
+                  <span className={`distributor-badge ${badgeClass}`}>{part.distributor}</span>
+                  <div className="mpn">{part.mpn}</div>
+                  <div className="manufacturer">{part.manufacturer}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                   {part.stock > 0 ? (
+                      <span className="stock-badge">{part.stock.toLocaleString()} UNITS</span>
+                   ) : (
+                      <span className="stock-badge" style={{ background: '#fef3c7', color: '#d97706', borderColor: '#fde68a' }}>CHECK STOCK</span>
+                   )}
                 </div>
               </div>
-              <button className="buy-btn" style={{ width: 'auto', padding: '1rem 2rem' }} onClick={() => handleLock(part)}>
-                LOCK STOCK
-              </button>
+
+              <table className="data-table">
+                <tbody>
+                  <tr><td className="label-cell">Source Type</td><td className="value-cell">{part.source_type}</td></tr>
+                  <tr><td className="label-cell">Risk Assessment</td><td className={`value-cell badge-risk-${part.risk_level.toLowerCase()}`}>{part.risk_level}</td></tr>
+                  <tr><td className="label-cell">Lead Time</td><td className="value-cell">{part.delivery}</td></tr>
+                  <tr><td className="label-cell">Description</td><td className="value-cell" style={{ fontSize: '0.8rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{part.description}</td></tr>
+                </tbody>
+              </table>
+
+              {!isDeepLink && (part.risk_level === 'Medium' || part.risk_level === 'High') && (
+                <div style={{ border: '1px dashed var(--success)', padding: '0.75rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>QC Protocol +₩72,500</span>
+                  <input type="checkbox" checked={part.is_qc_enabled} onChange={() => toggleQC(part.id, !!part.is_qc_enabled)} />
+                </div>
+              )}
+
+              <div className="pricing-row">
+                <div>
+                  {part.price > 0 ? (
+                    <>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UNIT PRICE</div>
+                      <div className="price-main">
+                        {part.price.toLocaleString()}<span className="currency">{part.currency}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="price-main" style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>
+                       {part.source_type === 'Deep Link' ? 'Market Price' : 'Quote Only'}
+                    </div>
+                  )}
+                </div>
+                
+                {isDeepLink ? (
+                    <button className="buy-btn" style={{ background: 'white', border: '1px solid var(--border)', color: 'var(--text-main)' }} onClick={() => window.open(part.datasheet, '_blank')}>
+                        CHECK WEBSITE ↗
+                    </button>
+                ) : (
+                    <button className="buy-btn" onClick={() => handleLock(part)}>
+                        LOCK STOCK
+                    </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from pydantic import BaseModel
 import uuid
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Rare Source - Intelligence Command API")
 
@@ -57,6 +61,7 @@ class LockConfirmation(BaseModel):
 # --- [2. 인텔리전스 소싱 커넥터] ---
 
 from scraper_examples import aggregate_from_multiple_sources
+from win_source_connector import WinSourceConnector
 
 # --- [2. 인텔리전스 소싱 커넥터] ---
 
@@ -124,7 +129,16 @@ async def fetch_meta_intel(query: str):
             "condition": "Refurbished (Certified)",
             "date_code": "Mixed"
         }
+
     ]
+
+async def fetch_win_source(query: str):
+    """[Tier 1.5] Win Source (Direct)"""
+    ws = WinSourceConnector()
+    results = await ws.fetch_prices(query)
+    if results:
+        return results
+    return []
 
 # --- [3. 핵심 어그리게이터 엔진] ---
 
@@ -139,7 +153,16 @@ class SourcingEngine:
         return price
 
     def _calculate_margin(self, price_krw: float, source_type: str) -> float:
-        margins = {"Meta Scraper": 1.25, "Direct Scraper": 1.18, "API": 1.12}
+        # Added new source types from scraper_examples.py
+        margins = {
+            "Meta Scraper": 1.25, 
+            "Direct Scraper": 1.18, 
+            "API": 1.12,
+            "Official API": 1.10,
+            "Deep Link": 1.05,
+            "EOL Partner": 1.20,
+            "Fallback": 1.0
+        }
         return round(price_krw * margins.get(source_type, 1.15))
 
     def _determine_risk(self, item: dict) -> str:
@@ -155,6 +178,7 @@ class SourcingEngine:
     async def aggregate_intel(self, query: str) -> List[StandardPart]:
         tasks = [
             fetch_tier1_api(query),
+            # fetch_win_source(query), # Disabled to prevent crash (Exit 137)
             fetch_broker_network(query),
             fetch_meta_intel(query)
         ]
@@ -164,26 +188,41 @@ class SourcingEngine:
         for source in results:
             if isinstance(source, list):
                 for item in source:
-                    krw_price = self._normalize_price(item.get("price_usd", 0), "USD")
-                    final_price = self._calculate_margin(krw_price, item['type'])
+                    # [FIX] Handle field mismatches between Scraper Module and Main logic
                     
+                    # 1. Price & Currency
+                    raw_price = item.get("price", item.get("price_usd", 0))
+                    raw_currency = item.get("currency", "USD")
+                    krw_price = self._normalize_price(float(raw_price), raw_currency)
+                    
+                    # 2. Source Type
+                    s_type = item.get("source_type") or item.get("type") or "API"
+                    
+                    final_price = self._calculate_margin(krw_price, s_type)
+                    
+                    # 3. Manufacturer
+                    mfr = item.get("manufacturer", item.get("mfr", "Unknown"))
+
                     standard_item = StandardPart(
                         id=str(uuid.uuid4())[:12],
-                        mpn=item['mpn'],
-                        manufacturer=item['mfr'],
-                        distributor=item['distributor'],
-                        source_type=item['type'],
-                        stock=item['stock'],
+                        mpn=item.get('mpn', 'N/A'),
+                        manufacturer=mfr,
+                        distributor=item.get('distributor', 'Unknown'),
+                        source_type=s_type,
+                        stock=item.get('stock', 0),
                         price=final_price,
                         price_history=self._generate_price_history(final_price),
                         currency="KRW",
-                        delivery=item['delivery'],
+                        delivery=item.get('delivery', 'Unknown'),
                         condition=item.get('condition', 'New'),
                         date_code=item.get('date_code', 'N/A'),
                         is_eol="Old Stock" in item.get('condition', '') or "Refurbished" in item.get('condition', ''),
-                        risk_level=self._determine_risk(item),
+                        risk_level=item.get('risk_level', self._determine_risk(item)),
                         updated_at=datetime.now()
                     )
+                    # Pass through extra fields if needed (like datasheet) via extra attributes or dict update if model allows
+                    # StandardPart definition in main.py is strict, so we only pass what fits.
+                    
                     flat_list.append(standard_item)
 
         return sorted(flat_list, key=lambda x: x.price)
