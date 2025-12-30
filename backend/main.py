@@ -39,7 +39,9 @@ class StandardPart(BaseModel):
     date_code: str          
     is_eol: bool            
     risk_level: str         
-    updated_at: datetime    
+    updated_at: datetime
+    datasheet: Optional[str] = ""
+    description: Optional[str] = ""
 
 class MarketStatus(BaseModel):
     market_temperature: str  # STABLE / VOLATILE / CRITICAL
@@ -176,11 +178,10 @@ class SourcingEngine:
         return [round(current_price * random.uniform(0.85, 1.15)) for _ in range(7)]
 
     async def aggregate_intel(self, query: str) -> List[StandardPart]:
+        # Use the comprehensive scraper module which includes all sources
         tasks = [
             fetch_tier1_api(query),
-            # fetch_win_source(query), # Disabled to prevent crash (Exit 137)
-            fetch_broker_network(query),
-            fetch_meta_intel(query)
+            fetch_win_source(query)
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -218,7 +219,9 @@ class SourcingEngine:
                         date_code=item.get('date_code', 'N/A'),
                         is_eol="Old Stock" in item.get('condition', '') or "Refurbished" in item.get('condition', ''),
                         risk_level=item.get('risk_level', self._determine_risk(item)),
-                        updated_at=datetime.now()
+                        updated_at=datetime.now(),
+                        datasheet=item.get('datasheet', ''),
+                        description=item.get('description', '')
                     )
                     # Pass through extra fields if needed (like datasheet) via extra attributes or dict update if model allows
                     # StandardPart definition in main.py is strict, so we only pass what fits.

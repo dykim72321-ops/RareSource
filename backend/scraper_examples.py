@@ -61,8 +61,20 @@ class MouserConnector:
     def _parse_results(self, data, query):
         parts = []
         try:
+            # DEBUG: Log response structure
+            print(f"📊 Mouser Response Keys: {list(data.keys()) if data else 'None'}")
+            
             search_results = data.get('SearchResults', {})
+            if not search_results:
+                print(f"⚠️  No 'SearchResults' in response. Available keys: {list(data.keys())}")
+                return []
+            
             items = search_results.get('Parts', [])
+            if not items:
+                print(f"⚠️  No 'Parts' found. SearchResults keys: {list(search_results.keys())}")
+                return []
+            
+            print(f"✓ Found {len(items)} parts from Mouser")
             
             for item in items:
                 # Stock normalization
@@ -102,6 +114,8 @@ class MouserConnector:
                 })
         except Exception as parse_err:
             print(f"⚠️ Mouser Parse Error: {parse_err}")
+            import traceback
+            traceback.print_exc()
             
         return parts
 
@@ -192,7 +206,16 @@ class DigiKeyConnector:
     def _parse_results(self, data, query):
         parts = []
         try:
+            # DEBUG: Log response structure
+            print(f"📊 Digi-Key Response Keys: {list(data.keys()) if data else 'None'}")
+            
             products = data.get("Products", [])
+            if not products:
+                print(f"⚠️  No 'Products' in response. Available keys: {list(data.keys())}")
+                return []
+            
+            print(f"✓ Found {len(products)} products from Digi-Key")
+            
             for item in products:
                 # Price logic
                 price = 0.0
@@ -223,6 +246,8 @@ class DigiKeyConnector:
                 })
         except Exception as e:
             print(f"⚠️ Digi-Key Parse Error: {e}")
+            import traceback
+            traceback.print_exc()
             
         return parts
 
@@ -253,7 +278,7 @@ class RochesterConnector:
             "source_type": "EOL Partner",
             "description": "Click to check EOL stock directly.",
             "delivery": "Check Website",
-            "datasheet": f"https://www.rocelec.com/search?q={query}" # Deep link
+            "datasheet": f"https://www.rocelec.com/search?q={query}"
         }]
 
 class FlipElectronicsConnector:
@@ -273,7 +298,7 @@ class FlipElectronicsConnector:
             "source_type": "EOL Partner",
             "description": "Authorized EOL Reseller",
             "delivery": "Contact for Quote",
-            "datasheet": f"https://www.flipelectronics.com/search?q={query}"
+            "datasheet": f"https://www.flipelectronics.com/?s={query}"
         }]
 
 # --- BROADLINE DISTRIBUTOR DEEP LINKS (No API Key Required) ---
@@ -293,7 +318,7 @@ class ArrowConnector:
             "source_type": "Deep Link",
             "description": "Global Distributor",
             "delivery": "Check Website",
-            "datasheet": f"https://www.arrow.com/en/products/search?q={query}"
+            "datasheet": "https://www.arrow.com" # Bot protection blocks direct search
         }]
 
 class FutureElectronicsConnector:
@@ -311,7 +336,7 @@ class FutureElectronicsConnector:
             "source_type": "Deep Link",
             "description": "Global Distributor",
             "delivery": "Check Website",
-            "datasheet": f"https://www.futureelectronics.com/search/?q={query}"
+            "datasheet": f"https://www.futureelectronics.com/c/semiconductors/{query}"
         }]
 
 class RSComponentsConnector:
@@ -329,7 +354,7 @@ class RSComponentsConnector:
             "source_type": "Deep Link",
             "description": "Global Distributor",
             "delivery": "Check Website",
-            "datasheet": f"https://uk.rs-online.com/web/c/?searchTerm={query}"
+            "datasheet": f"https://uk.rs-online.com/web/c/?searchTerm={query}" # This format works
         }]
 
 # =============================================================================
