@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
+import Header from './components/Header';
+import LandingPage from './components/LandingPage';
+import PricingTable from './components/PricingTable';
 
 // --- Types ---
 interface ComponentPart {
@@ -36,7 +40,9 @@ type JourneyPhase = 'IDLE' | 'SCOUTING' | 'RESULTS';
 
 const QC_PRICE = 72500;
 
-const App: React.FC = () => {
+const SearchPlatform: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [phase, setPhase] = useState<JourneyPhase>('IDLE');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ComponentPart[]>([]);
@@ -48,6 +54,15 @@ const App: React.FC = () => {
   const [marketStats, setMarketStats] = useState<MarketStats | null>(null);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  // Check for query parameter on mount
+  useEffect(() => {
+    const urlQuery = searchParams.get('q');
+    if (urlQuery) {
+      setQuery(urlQuery);
+      handleSearch(undefined, urlQuery);
+    }
+  }, [searchParams]);
 
   // --- Logic ---
   useEffect(() => {
@@ -149,25 +164,6 @@ const App: React.FC = () => {
     } catch (err) {
       alert("Security protocol violation during lock sequence.");
     }
-  };
-
-  // --- Visual Helpers ---
-  const Sparkline = ({ data }: { data: number[] }) => {
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min;
-    return (
-      <div className="sparkline" style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '20px' }}>
-        {data.map((v, i) => (
-          <div key={i} style={{ 
-            width: '4px', 
-            height: `${((v - min) / range) * 100}%`, 
-            background: 'var(--accent)',
-            opacity: 0.3 + (i / data.length) * 0.7 
-          }} />
-        ))}
-      </div>
-    );
   };
 
   // --- Render Components ---
@@ -392,6 +388,22 @@ const App: React.FC = () => {
       {showSuccess && renderSuccessModal()}
     </div>
   );
-}
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={
+          <>
+            <Header showSearch={false} />
+            <LandingPage />
+          </>
+        } />
+        <Route path="/search" element={<SearchPlatform />} />
+      </Routes>
+    </Router>
+  );
+};
 
 export default App;

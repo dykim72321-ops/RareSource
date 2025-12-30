@@ -3,24 +3,31 @@
   --bg-app: #f8fafc;        /* 밝은 회색 배경 */
   --bg-panel: #ffffff;      /* 흰색 카드 배경 */
   --bg-sidebar: #0f172a;    /* 전문적인 진한 네이비 사이드바 */
+  --bg-hero: #1e3a8a;       /* Octopart 스타일 딥 블루 */
   
-  --primary: #2563eb;       /* 신뢰감 있는 블루 */
-  --primary-hover: #1d4ed8;
-  --accent: #0ea5e9;        /* 밝은 블루 (강조) */
+  --primary: #1e3a8a;       /* Lapiz Blue - 전문적인 딥 블루 */
+  --primary-hover: #1e40af;
+  --primary-light: #3b82f6;
+  --accent: #10b981;        /* 에메랄드 그린 (가격/재고 긍정) */
+  --accent-hover: #059669;
   
   --text-main: #0f172a;     /* 진한 검정 (가독성) */
   --text-secondary: #64748b;/* 회색 (보조) */
   --text-muted: #94a3b8;    /* 연한 회색 */
+  --text-white: #ffffff;
   
   --border: #e2e8f0;        /* 얇은 경계선 */
+  --border-light: #f1f5f9;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
   
   --safe: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   
   --sidebar-width: 260px;
+  --header-height: 64px;
 }
 
 * { box-sizing: border-box; }
@@ -401,3 +408,383 @@ body {
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+/* === LANDING PAGE STYLES === */
+
+/* Hero Section with Circuit Pattern */
+.landing-hero {
+  background: linear-gradient(135deg, var(--bg-hero) 0%, #1e40af 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+}
+
+.landing-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px);
+  opacity: 0.5;
+}
+
+.landing-hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+}
+
+.landing-hero h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.landing-hero p {
+  font-size: 1.25rem;
+  margin-bottom: 3rem;
+  color: rgba(255,255,255,0.9);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.landing-search-large {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.landing-search-large input {
+  width: 100%;
+  padding: 1.25rem 1.75rem;
+  font-size: 1.15rem;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.landing-search-large button {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  bottom: 10px;
+  padding: 0 2rem;
+  background: var(--primary);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.landing-search-large button:hover {
+  background: var(--primary-hover);
+  transform: translateX(-2px);
+}
+
+/* Feature Cards Section */
+.features-section {
+  padding: 5rem 2rem;
+  background: var(--bg-app);
+}
+
+.features-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.features-title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.features-subtitle {
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 4rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.feature-card {
+  background: white;
+  padding: 2.5rem 2rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+  text-align: center;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+
+.feature-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  color: white;
+}
+
+.feature-card h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.feature-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+/* Stats Section */
+.stats-section {
+  background: white;
+  padding: 4rem 2rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 3rem;
+  text-align: center;
+}
+
+.stat-item h3 {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.stat-item p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* CTA Section */
+.cta-section {
+  padding: 5rem 2rem;
+  background: var(--bg-app);
+  text-align: center;
+}
+
+.cta-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.cta-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 2.5rem;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  padding: 1rem 2.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--primary);
+  padding: 1rem 2.5rem;
+  border: 2px solid var(--primary);
+  border-radius: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 1rem;
+}
+
+.btn-secondary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* Header Component */
+.app-header {
+  height: var(--header-height);
+  background: white;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+.header-logo {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.header-search {
+  flex: 1;
+  max-width: 600px;
+  margin: 0 2rem;
+  position: relative;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hamburger-menu {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.hamburger-menu:hover {
+  color: var(--text-main);
+}
+
+/* Pricing Table Component */
+.pricing-table-wrapper {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+.pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: white;
+}
+
+.pricing-table thead {
+  background: var(--bg-app);
+  border-bottom: 2px solid var(--border);
+}
+
+.pricing-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pricing-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.pricing-table tbody tr:hover {
+  background: rgba(30, 58, 138, 0.02);
+}
+
+.distributor-name {
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stock-available {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stock-unavailable {
+  color: var(--text-muted);
+}
+
+.price-tier {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.last-updated {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .landing-hero h1 {
+    font-size: 2.5rem;
+  }
+  
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-secondary {
+    margin-left: 0;
+    margin-top: 1rem;
+  }
+  
+  .header-search {
+    display: none;
+  }
+}
