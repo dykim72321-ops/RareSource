@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Import cache manager
+from cache_manager import get_cache_manager
+
 app = FastAPI(title="Rare Source - Intelligence Command API")
 
 # Enable CORS for frontend
@@ -248,8 +251,26 @@ async def get_market_stats():
 
 @app.get("/search", response_model=List[StandardPart])
 async def search(q: str = Query(..., min_length=1)):
-    """부품 통합 검색 및 지능형 필터링"""
-    return await engine.aggregate_intel(q)
+    """부품 통합 검색 및 지능형 필터링 (캐싱 적용)"""
+    
+    # Initialize cache manager
+    cache_manager = get_cache_manager()
+    
+    # Check cache first
+    cached_results = await cache_manager.get_cached_results(q)
+    if cached_results:
+        # Convert cached dict results back to StandardPart models
+        return [StandardPart(**item) for item in cached_results]
+    
+    # Cache miss - perform actual search
+    results = await engine.aggregate_intel(q)
+    
+    # Store in cache for future requests
+    # Convert Pydantic models to dicts for JSON storage
+    results_dict = [item.model_dump(mode='json') for item in results]
+    await cache_manager.set_cache(q, results_dict)
+    
+    return results
 
 @app.post("/procurement/lock", response_model=LockConfirmation)
 async def lock_stock(req: ProcurementLock):
