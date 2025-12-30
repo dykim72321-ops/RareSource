@@ -248,7 +248,8 @@ class MouserConnector:
                     "datasheet": item.get('DataSheetUrl', ''),
                     "description": item.get('Description', ''),
                     "date_code": "2024+", # Placeholder
-                    "delivery": item.get('LeadTime', 'In Stock')
+                    "delivery": item.get('LeadTime', 'In Stock'),
+                    "product_url": f"https://www.mouser.kr/Search/Refine?Keyword={query}"
                 })
         except Exception as parse_err:
             print(f"⚠️ Mouser Parse Error: {parse_err}")
@@ -380,7 +381,8 @@ class DigiKeyConnector:
                     "datasheet": item.get("DatasheetUrl", ""),
                     "description": item.get("ProductDescription", ""),
                     "date_code": "2024+",
-                    "delivery": "Immediate" if stock > 0 else "Backorder"
+                    "delivery": "Immediate" if stock > 0 else "Backorder",
+                    "product_url": item.get("ProductUrl", "")
                 })
         except Exception as e:
             print(f"⚠️ Digi-Key Parse Error: {e}")
@@ -412,11 +414,13 @@ class RochesterConnector:
             "price": 0.0,
             "currency": "USD",
             "condition": "Authorized EOL",
+            "is_eol": True,
             "risk_level": "Low",
             "source_type": "EOL Partner",
             "description": "Click to check EOL stock directly.",
             "delivery": "Check Website",
-            "datasheet": f"https://www.rocelec.com/search?q={query}"
+            "datasheet": f"https://www.rocelec.com/search?q={query}",
+            "product_url": f"https://www.rocelec.com/parts/{query}"
         }]
 
 class FlipElectronicsConnector:
@@ -432,11 +436,13 @@ class FlipElectronicsConnector:
             "price": 0.0,
             "currency": "USD",
             "condition": "EOL / Obsolete",
+            "is_eol": True,
             "risk_level": "Low",
             "source_type": "EOL Partner",
             "description": "Authorized EOL Reseller",
             "delivery": "Contact for Quote",
-            "datasheet": f"https://www.flipelectronics.com/?s={query}"
+            "datasheet": f"https://www.flipelectronics.com/?s={query}",
+            "product_url": f"https://www.flipelectronics.com/search?q={query}"
         }]
 
 # --- BROADLINE DISTRIBUTOR DEEP LINKS (No API Key Required) ---

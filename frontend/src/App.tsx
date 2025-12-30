@@ -25,6 +25,7 @@ interface ComponentPart {
   is_qc_enabled?: boolean;
   datasheet?: string;
   description?: string;
+  product_url?: string;
 }
 
 interface MarketStats {
@@ -281,7 +282,8 @@ const SearchPlatform: React.FC = () => {
       <div className="results-grid">
         {results.map(part => {
           const badgeClass = getDistributorBadgeClass(part.distributor);
-          const isDeepLink = part.source_type === 'Deep Link' || part.source_type === 'EOL Partner';
+          const hasUrl = !!(part.product_url || part.datasheet);
+          const isOfficial = part.source_type === 'Official API';
 
           return (
             <div key={part.id} className="card">
@@ -309,15 +311,15 @@ const SearchPlatform: React.FC = () => {
                 </tbody>
               </table>
 
-              {!isDeepLink && (part.risk_level === 'Medium' || part.risk_level === 'High') && (
+              {!isOfficial && (part.risk_level === 'Medium' || part.risk_level === 'High') && (
                 <div style={{ border: '1px dashed var(--success)', padding: '0.75rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>QC Protocol +₩72,500</span>
                   <input type="checkbox" checked={part.is_qc_enabled} onChange={() => toggleQC(part.id, !!part.is_qc_enabled)} />
                 </div>
               )}
 
-              <div className="pricing-row">
-                <div>
+              <div className="pricing-row" style={{ gap: '0.5rem' }}>
+                <div style={{ flex: 1 }}>
                   {part.price > 0 ? (
                     <>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UNIT PRICE</div>
@@ -332,15 +334,29 @@ const SearchPlatform: React.FC = () => {
                   )}
                 </div>
                 
-                {isDeepLink ? (
-                    <button className="buy-btn" style={{ background: 'white', border: '1px solid var(--border)', color: 'var(--text-main)' }} onClick={() => window.open(part.datasheet, '_blank')}>
-                        CHECK WEBSITE ↗
-                    </button>
-                ) : (
-                    <button className="buy-btn" onClick={() => handleLock(part)}>
-                        LOCK STOCK
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {hasUrl && (
+                        <button 
+                            className="buy-btn" 
+                            style={{ 
+                                background: 'white', 
+                                border: '1px solid var(--border)', 
+                                color: 'var(--text-main)',
+                                padding: '0.5rem 0.75rem',
+                                minWidth: 'auto'
+                            }} 
+                            onClick={() => window.open(part.product_url || part.datasheet, '_blank')}
+                        >
+                            GO TO SITE ↗
+                        </button>
+                    )}
+                    
+                    {isOfficial && (
+                        <button className="buy-btn" onClick={() => handleLock(part)} style={{ padding: '0.5rem 0.75rem', minWidth: 'auto' }}>
+                            LOCK
+                        </button>
+                    )}
+                </div>
               </div>
             </div>
           );

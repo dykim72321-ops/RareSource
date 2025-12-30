@@ -45,6 +45,7 @@ class StandardPart(BaseModel):
     updated_at: datetime
     datasheet: Optional[str] = ""
     description: Optional[str] = ""
+    product_url: Optional[str] = ""
 
 class MarketStatus(BaseModel):
     market_temperature: str  # STABLE / VOLATILE / CRITICAL
