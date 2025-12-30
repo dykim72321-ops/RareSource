@@ -17,8 +17,146 @@ load_dotenv()
 try:
     import httpx
     from bs4 import BeautifulSoup
+    from openai import AsyncOpenAI
 except ImportError:
-    print("⚠️  httpx and beautifulsoup4 are required. Please pip install them.")
+    print("⚠️  httpx, beautifulsoup4, and openai are required. Please pip install them.")
+
+# =============================================================================
+# FINDCHIPS + OPENAI CONNECTORS (Intelligent Scraping)
+# =============================================================================
+
+class OpenAIParserConnector:
+    """
+    Uses OpenAI API to intelligently parse HTML and extract structured data.
+    """
+    def __init__(self):
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
+        
+    async def parse_html_to_json(self, html_content: str, part_number: str) -> List[Dict]:
+        """Parse HTML content using GPT-4o-mini to extract component data"""
+        if not self.client:
+            print("⚠️  OpenAI API Key missing. Skipping AI parsing.")
+            return []
+            
+        # Truncate HTML to reduce token usage
+        max_html_length = 8000
+        if len(html_content) > max_html_length:
+            html_content = html_content[:max_html_length] + "..."
+            
+        prompt = f"""Extract electronic component data from the following HTML and return ONLY a JSON array.
+Each item should have these fields:
+- distributor (string)
+- mpn (string, the manufacturer part number)
+- manufacturer (string)
+- stock (integer, 0 if unknown)
+- price (float, 0 if unknown)
+- currency (string, default "USD")
+- delivery (string)
+- description (string, brief)
+
+Part Number: {part_number}
+
+HTML:
+{html_content}
+
+Return ONLY the JSON array, no markdown formatting or explanations."""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",  # Cost-effective model
+                messages=[
+                    {"role": "system", "content": "You are a data extraction assistant. Return only valid JSON arrays."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=2000
+            )
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Remove markdown code blocks if present
+            if content.startswith("```"):
+                content = re.sub(r'^```(?:json)?\n?', '', content)
+                content = re.sub(r'\n?```$', '', content)
+            
+            # Parse JSON
+            import json
+            data = json.loads(content)
+            
+            print(f"✓ OpenAI parsed {len(data)} items from HTML")
+            return data
+            
+        except json.JSONDecodeError as e:
+            print(f"⚠️  OpenAI returned invalid JSON: {e}")
+            print(f"Response: {content[:200]}...")
+            return []
+        except Exception as e:
+            print(f"❌ OpenAI Parser Exception: {e}")
+            return []
+
+class FindChipsConnector:
+    """
+    Scrapes FindChips.com and uses OpenAI to parse results intelligently.
+    """
+    def __init__(self):
+        self.base_url = "https://www.findchips.com/search"
+        self.openai_parser = OpenAIParserConnector()
+        
+    async def fetch_prices(self, query: str) -> List[Dict]:
+        """Fetch component data from FindChips using AI-powered parsing"""
+        url = f"{self.base_url}/{query}"
+        
+        try:
+            print(f"🔍 Scraping FindChips for: {query}...")
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+            
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                response = await client.get(url, headers=headers)
+                
+                if response.status_code != 200:
+                    print(f"⚠️  FindChips returned status {response.status_code}")
+                    return []
+                
+                html_content = response.text
+                
+                # Use OpenAI to parse the HTML
+                parsed_data = await self.openai_parser.parse_html_to_json(html_content, query)
+                
+                # Normalize to our format
+                results = []
+                for item in parsed_data:
+                    results.append({
+                        "distributor": item.get("distributor", "FindChips Source"),
+                        "mpn": item.get("mpn", query.upper()),
+                        "manufacturer": item.get("manufacturer", "Unknown"),
+                        "stock": item.get("stock", 0),
+                        "price": item.get("price", 0.0),
+                        "currency": item.get("currency", "USD"),
+                        "condition": "New",
+                        "risk_level": "Low",
+                        "source_type": "FindChips (AI Parsed)",
+                        "description": item.get("description", "Multi-source aggregated data"),
+                        "delivery": item.get("delivery", "Check Distributor"),
+                        "date_code": "2024+",
+                        "datasheet": f"https://www.findchips.com/search/{query}"
+                    })
+                
+                if results:
+                    print(f"✓ FindChips found {len(results)} results via AI parsing")
+                else:
+                    print("⚠️  No results extracted from FindChips")
+                    
+                return results
+                
+        except Exception as e:
+            print(f"❌ FindChips Connector Exception: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
 # --- MOUSER API CONNECTOR (Real Data) ---
 class MouserConnector:
@@ -363,11 +501,12 @@ class RSComponentsConnector:
 
 async def aggregate_from_multiple_sources(mpn: str) -> List[Dict]:
     """
-    Aggregates data from 7 Sources: Mouser, Digi-Key, Rochester, Flip, Arrow, Future, RS.
+    Aggregates data from 8 Sources: FindChips+AI, Mouser, Digi-Key, Rochester, Flip, Arrow, Future, RS.
     """
     results = []
     
     # Run Connectors in Parallel
+    findchips = FindChipsConnector()
     mouser = MouserConnector()
     digikey = DigiKeyConnector()
     rochester = RochesterConnector()
@@ -378,6 +517,7 @@ async def aggregate_from_multiple_sources(mpn: str) -> List[Dict]:
     
     # Execute ALL API calls concurrently
     tasks = [
+        findchips.fetch_prices(mpn),  # NEW: FindChips with AI parsing
         mouser.fetch_prices(mpn),
         digikey.fetch_prices(mpn),
         rochester.fetch_prices(mpn),
